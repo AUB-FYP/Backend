@@ -1,0 +1,181 @@
+swagger: '2.0'
+info:
+  title: User Authentication API
+  description: API for user authentication
+  version: '1.0'
+basePath: /api
+paths:
+  /user/:
+    post:
+      summary: Create a new user
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - in: body
+          name: user
+          description: User object
+          required: true
+          schema:
+            type: object
+            properties:
+              user_name:
+                type: string
+              password:
+                type: string
+      responses:
+        201:
+          description: User created successfully
+          schema:
+            type: object
+            properties:
+              id:
+                type: integer
+              user_name:
+                type: string
+              funds:
+                type: number
+              stocks:
+                type: array
+                items:
+                  type: object
+        400:
+          description: Bad request
+    get:
+      summary: Get user information
+      produces:
+        - application/json
+      responses:
+        200:
+          description: User information retrieved successfully
+          schema:
+            $ref: '#/definitions/User'
+        401:
+          description: Unauthorized
+        404:
+          description: User not found
+  /user/{user_id}/stocks:
+    post:
+      summary: Add a stock to user's portfolio
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - in: path
+          name: user_id
+          description: User ID
+          required: true
+          type: integer
+        - in: body
+          name: stock
+          description: Stock object
+          required: true
+          schema:
+            type: object
+            properties:
+              stock_ticker:
+                type: string
+      responses:
+        200:
+          description: Stock added successfully
+        400:
+          description: Bad request
+        404:
+          description: User not found
+        500:
+          description: Internal server error
+    get:
+      summary: Get stock information for user
+      produces:
+        - application/json
+      parameters:
+        - in: path
+          name: user_id
+          description: User ID
+          required: true
+          type: integer
+        - in: body
+          name: stock_info
+          description: Stock information object
+          required: true
+          schema:
+            type: object
+            properties:
+              stock_ticker:
+                type: string
+              start_date:
+                type: string
+              end_date:
+                type: string
+      responses:
+        200:
+          description: Stock information retrieved successfully
+          schema:
+            type: object
+        400:
+          description: Bad request
+        404:
+          description: User not found
+        500:
+          description: Internal server error
+  /authentication/:
+    post:
+      summary: Authenticate user
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - in: body
+          name: user
+          description: User credentials
+          required: true
+          schema:
+            type: object
+            properties:
+              user_name:
+                type: string
+              password:
+                type: string
+      responses:
+        200:
+          description: User authenticated successfully
+          schema:
+            type: object
+            properties:
+              token:
+                type: string
+        400:
+          description: Bad request
+        401:
+          description: Unauthorized
+        404:
+          description: User not found
+definitions: 
+  Token:
+    type: object
+    properties:
+      token:
+        type: string
+  User:
+    type: object
+    properties:
+      id:
+        type: integer
+      user_name:
+        type: string
+      funds:
+        type: number
+      stocks:
+        type: array
+        items:
+          $ref: '#/definitions/Stock'
+  Stock:
+    type: object
+    properties:
+      id:
+        type: integer
+      stock_ticker:
+        type: string
