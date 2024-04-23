@@ -2,6 +2,13 @@ from __future__ import annotations
 
 import pandas as pd
 import yfinance as yf
+import re
+
+
+def is_date_well_formatted(date: str) -> bool:
+    """Check if the date is well formatted"""
+    date_pattern = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+    return date_pattern.match(date)
 
 
 class News_object:
