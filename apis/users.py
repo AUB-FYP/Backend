@@ -1,9 +1,9 @@
 from flask import request, jsonify, Blueprint, abort
-from config.database import User, user_schema, UserStock
+from config.database import User, user_schema, UserStock, user_stock_schema
 from config.database import db
 from services.authentication import extract_auth_token, decode_token
 import jwt, re
-from services.utils import YahooDownloader
+from services.utils import YahooDownloader, is_date_well_formatted
 
 
 users = Blueprint("users", __name__, url_prefix="/user")
@@ -67,6 +67,53 @@ def get_user_info():
     return jsonify(user_schema.dump(user)), 200
 
 
+@users.route("/<int:user_id>", methods=["POST"])
+def modify_user_info(user_id):
+
+    data = request.get_json()
+    user = User.query.get(user_id)
+
+    if not user:
+        return jsonify({"message": "User not found"}), 404
+
+    errors = {}
+    if "stock_tickers" not in data:
+        errors["stock_tickers"] = "stock tickers are missing"
+    elif not isinstance(data["stock_tickers"], list):
+        errors["stock_tickers"] = "stock tickers must be a list"
+
+    if "shares_owned" not in data:
+        errors["shares_owned"] = "shares owned is missing"
+    elif not isinstance(data["shares_owned"], list):
+        errors["shares_owned"] = "shares owned must be a list"
+
+    if "money_owned" not in data:
+        errors["money_owned"] = "money owned is missing"
+    elif not isinstance(data["money_owned"], float):
+        errors["money_owned"] = "money owned must be a float"
+
+    if len(errors) != 0:
+        return jsonify(errors), 400
+
+    stock_tickers = data["stock_tickers"]
+    shares_owned = data["shares_owned"]
+    money_owned = data["money_owned"]
+
+    for stock_ticker, shares in zip(stock_tickers, shares_owned):
+        user_stock = UserStock.query.filter_by(
+            user_id=user_id, stock=stock_ticker
+        ).first()
+        if not user_stock:
+            user_stock = UserStock(user_id=user_id, stock=stock_ticker, shares = shares)
+            db.session.add(user_stock)
+        user_stock.shares = shares
+
+    user.funds = money_owned
+
+    db.session.commit()
+    return jsonify({"message": "User information updated"}), 200
+
+
 @users.route("/<int:user_id>/stocks", methods=["POST"])
 def add_stock_to_user(user_id):
     data = request.get_json()
@@ -105,7 +152,6 @@ def add_stock_to_user(user_id):
 def get_stock_information(user_id):
     data = request.get_json()
     user = User.query.get(user_id)
-    date_pattern = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
     if not user:
         return jsonify({"message": "User not found"}), 404
@@ -119,14 +165,14 @@ def get_stock_information(user_id):
 
     if "start_date" not in data:
         errors["start_date"] = "start date is missing"
-    elif not isinstance(data["start_date"], str) or not date_pattern.match(
+    elif not isinstance(data["start_date"], str) or not is_date_well_formatted(
         data["start_date"]
     ):
         errors["start_date"] = "start date must be in 'YYYY-MM-DD' format"
 
     if "end_date" not in data:
         errors["end_date"] = "end date is missing"
-    elif not isinstance(data["end_date"], str) or not date_pattern.match(
+    elif not isinstance(data["end_date"], str) or not is_date_well_formatted(
         data["end_date"]
     ):
         errors["end_date"] = "end date must be in 'YYYY-MM-DD' format"
