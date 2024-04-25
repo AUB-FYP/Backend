@@ -4,6 +4,8 @@ from config.database import db
 from services.authentication import extract_auth_token, decode_token
 import jwt, re
 from services.utils import YahooDownloader, is_date_well_formatted
+import modal
+from datetime import datetime, timedelta
 
 
 users = Blueprint("users", __name__, url_prefix="/user")
@@ -104,7 +106,7 @@ def modify_user_info(user_id):
             user_id=user_id, stock=stock_ticker
         ).first()
         if not user_stock:
-            user_stock = UserStock(user_id=user_id, stock=stock_ticker, shares = shares)
+            user_stock = UserStock(user_id=user_id, stock=stock_ticker, shares=shares)
             db.session.add(user_stock)
         user_stock.shares = shares
 
@@ -146,6 +148,43 @@ def add_stock_to_user(user_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({"message": "An error occurred while adding the stock"}), 500
+
+
+@users.route("/<int:user_id>/stocks", methods=["DELETE"])
+def delete_stock_from_user(user_id):
+    data = request.get_json()
+    user = User.query.get(user_id)
+
+    if not user:
+        return jsonify({"message": "User not found"}), 404
+
+    errors = {}
+
+    if "stock_ticker" not in data:
+        errors["stock_ticker"] = "stock ticker is missing"
+    elif type(data["stock_ticker"]) != str:
+        errors["stock_ticker"] = "stock ticker must be a string"
+
+    if len(errors) != 0:
+        return jsonify(errors), 400
+
+    stock_ticker = data["stock_ticker"]
+
+    user_stock = UserStock.query.filter_by(user_id=user.id, stock=stock_ticker).first()
+
+    if not user_stock:
+        return jsonify({"message": "Stock not found"}), 404
+
+    try:
+        db.session.delete(user_stock)
+        db.session.commit()
+        return (
+            jsonify({"message": f"Stock '{stock_ticker}' deleted for user {user_id}"}),
+            200,
+        )
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"message": "An error occurred while deleting the stock"}), 500
 
 
 @users.route("/<int:user_id>/stocks", methods=["GET"])
@@ -192,3 +231,60 @@ def get_stock_information(user_id):
         return jsonify({"message": "Error fetching data"}), 500
 
     return jsonify(stock_data.to_dict()), 200
+
+
+@users.route("/<int:user_id>/model", methods=["GET"])
+def train_model(user_id):
+    user = User.query.get(user_id)
+
+    if not user:
+        return jsonify({"message": "User not found"}), 404
+
+    username = user.user_name
+    user_funds = user.funds
+    user_stocks_tickers = [stock.stock for stock in user.stocks]
+    start_date = "2015-01-01"
+    end_date = "2021-01-01"
+
+    yahooDownloader = YahooDownloader(start_date, end_date, user_stocks_tickers)
+    stock_data = None
+    try:
+        stock_data = yahooDownloader.fetch_data()
+    except Exception as e:
+        return jsonify({"message": "Error fetching data"}), 500
+
+    stock_data["sentiment"] = 0
+
+    process = modal.Function.lookup("hello", "train")
+    response = process.remote(username, user_funds, user_stocks_tickers, stock_data)
+
+    return (
+        jsonify(f"Model Trained for {username}, for stocks : {user_stocks_tickers}"),
+        200,
+    )
+
+
+@users.route("/<int:user_id>/infer", methods=["GET"])
+def infer(user_id):
+    user = User.query.get(user_id)
+
+    if not user:
+        return jsonify({"message": "User not found"}), 404
+
+    username = user.user_name
+    end_date = datetime.today().date().strftime("%Y-%m-%d")
+    start_date = datetime.today().date() - timedelta(days=45)
+    user_stocks_tickers = [stock.stock for stock in user.stocks]
+
+    yahooDownloader = YahooDownloader(start_date, end_date, user_stocks_tickers)
+    stock_data = None
+    try:
+        stock_data = yahooDownloader.fetch_data()
+    except Exception as e:
+        return jsonify({"message": "Error fetching data"}), 500
+
+    stock_data["sentiment"] = 0
+    process = modal.Function.lookup("hello", "infer")
+    response = process.remote(username, stock_data)
+    print(response)
+    return jsonify(response.to_json("")), 200
