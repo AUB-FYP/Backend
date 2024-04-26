@@ -119,14 +119,15 @@ def modify_user_info(username):
     return jsonify({"message": "User information updated"}), 200
 
 
-@users.route("/<int:user_id>/stocks", methods=["POST"])
-def add_stock_to_user(user_id):
+@users.route("/<string:username>/stocks", methods=["POST"])
+def add_stock_to_user(username):
     data = request.get_json()
-    user = User.query.get(user_id)
+    user = User.query.filter_by(user_name=username).first()
 
     if not user:
         return jsonify({"message": "User not found"}), 404
 
+    user_id = user.id
     errors = {}
 
     if "stock_ticker" not in data:
@@ -153,14 +154,15 @@ def add_stock_to_user(user_id):
         return jsonify({"message": "An error occurred while adding the stock"}), 500
 
 
-@users.route("/<int:user_id>/stocks", methods=["DELETE"])
-def delete_stock_from_user(user_id):
+@users.route("/<string:username>/stocks", methods=["DELETE"])
+def delete_stock_from_user(username):
     data = request.get_json()
-    user = User.query.get(user_id)
+    user = User.query.filter_by(user_name=username).first()
 
     if not user:
         return jsonify({"message": "User not found"}), 404
 
+    user_id = user.id
     errors = {}
 
     if "stock_ticker" not in data:
@@ -190,14 +192,16 @@ def delete_stock_from_user(user_id):
         return jsonify({"message": "An error occurred while deleting the stock"}), 500
 
 
-@users.route("/<int:user_id>/stocks", methods=["GET"])
-def get_stock_information(user_id):
+@users.route("/<string:username>/stocks", methods=["GET"])
+def get_stock_information(username):
+
     data = request.get_json()
-    user = User.query.get(user_id)
+    user = User.query.filter_by(user_name=username).first()
 
     if not user:
         return jsonify({"message": "User not found"}), 404
 
+    user_id = user.id
     errors = {}
 
     if "stock_ticker" not in data:
@@ -236,12 +240,14 @@ def get_stock_information(user_id):
     return jsonify(stock_data.to_dict()), 200
 
 
-@users.route("/<int:user_id>/model", methods=["GET"])
-def train_model(user_id):
-    user = User.query.get(user_id)
+@users.route("/<string:username>/model", methods=["GET"])
+def train_model(username):
+    user = User.query.filter_by(user_name=username).first()
 
     if not user:
         return jsonify({"message": "User not found"}), 404
+
+    user_id = user.id
 
     username = user.user_name
     user_funds = user.funds
@@ -267,13 +273,14 @@ def train_model(user_id):
     )
 
 
-@users.route("/<int:user_id>/infer", methods=["GET"])
-def infer(user_id):
-    user = User.query.get(user_id)
+@users.route("/<string:username>/infer", methods=["GET"])
+def infer(username):
+    user = User.query.filter_by(user_name=username).first()
 
     if not user:
         return jsonify({"message": "User not found"}), 404
 
+    user_id = user.id
     username = user.user_name
     end_date = datetime.today().date().strftime("%Y-%m-%d")
     start_date = datetime.today().date() - timedelta(days=45)
