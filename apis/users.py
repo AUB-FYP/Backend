@@ -7,8 +7,11 @@ from services.utils import YahooDownloader, is_date_well_formatted, format_json
 import modal
 from datetime import datetime, timedelta
 import pandas as pd
+from flask.cli import load_dotenv
 
 users = Blueprint("users", __name__, url_prefix="/user")
+
+load_dotenv()
 
 
 @users.route("/", methods=["POST"], strict_slashes=False)
