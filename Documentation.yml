@@ -148,7 +148,7 @@ paths:
           description: "Unauthorized or token expired"
         "404":
           description: "User not found"
-  /{user_id}:
+  /{username}:
     post:
       tags:
         - "user"
@@ -191,7 +191,7 @@ paths:
           description: "Validation error"
         "404":
           description: "User not found"
-  /{user_id}/stocks:
+  /{username}/stocks:
     post:
       tags:
         - "user"
@@ -203,9 +203,9 @@ paths:
         - "application/json"
       parameters:
         - in: "path"
-          name: "user_id"
+          name: "username"
           required: true
-          type: "integer"
+          type: "string"
         - in: "body"
           name: "body"
           description: "Object containing the stock ticker"
@@ -237,9 +237,9 @@ paths:
         - "application/json"
       parameters:
         - in: "path"
-          name: "user_id"
+          name: "username"
           required: true
-          type: "integer"
+          type: "string"
         - in: "body"
           name: "body"
           description: "Object containing the stock ticker to be deleted"
@@ -271,9 +271,9 @@ paths:
         - "application/json"
       parameters:
         - in: "path"
-          name: "user_id"
+          name: "username"
           required: true
-          type: "integer"
+          type: "string"
         - in: "body"
           name: "body"
           description: "Object containing the stock ticker and date range"
@@ -300,7 +300,7 @@ paths:
           description: "User not found"
         "500":
           description: "Error fetching data"
-  /{user_id}/model:
+  /{username}/model:
     get:
       tags:
         - "user"
@@ -310,9 +310,9 @@ paths:
         - "application/json"
       parameters:
         - in: "path"
-          name: "user_id"
+          name: "username"
           required: true
-          type: "integer"
+          type: "string"
       responses:
         "200":
           description: "Model trained"
@@ -320,7 +320,7 @@ paths:
           description: "User not found"
         "500":
           description: "Error fetching data"
-  /{user_id}/infer:
+  /{username}/infer:
     get:
       tags:
         - "user"
@@ -330,9 +330,9 @@ paths:
         - "application/json"
       parameters:
         - in: "path"
-          name: "user_id"
+          name: "username"
           required: true
-          type: "integer"
+          type: "string"
       responses:
         "200":
           description: "Predictions made"
