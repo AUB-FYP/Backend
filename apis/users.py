@@ -2,8 +2,8 @@ from flask import request, jsonify, Blueprint, abort
 from config.database import User, user_schema, UserStock, user_stock_schema
 from config.database import db
 from services.authentication import extract_auth_token, decode_token
-import jwt, re
-from services.utils import YahooDownloader, is_date_well_formatted
+import jwt, re, json
+from services.utils import YahooDownloader, is_date_well_formatted, format_json
 import modal
 from datetime import datetime, timedelta
 
@@ -69,15 +69,16 @@ def get_user_info():
     return jsonify(user_schema.dump(user)), 200
 
 
-@users.route("/<int:user_id>", methods=["POST"])
-def modify_user_info(user_id):
+@users.route("/<string:username>", methods=["POST"])
+def modify_user_info(username):
 
     data = request.get_json()
-    user = User.query.get(user_id)
+    user = User.query.filter_by(user_name=username).first()
 
     if not user:
         return jsonify({"message": "User not found"}), 404
 
+    user_id = user.id
     errors = {}
     if "stock_tickers" not in data:
         errors["stock_tickers"] = "stock tickers are missing"
@@ -286,5 +287,6 @@ def infer(user_id):
     stock_data["sentiment"] = 0
     process = modal.Function.lookup("hello", "infer")
     response = process.remote(username, stock_data)
-    print(response)
-    return jsonify(response.to_json("")), 200
+    json_response = format_json(response)
+    print(json_response)
+    return jsonify(json.loads(json_response)), 200

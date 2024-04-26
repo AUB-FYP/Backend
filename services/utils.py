@@ -124,3 +124,9 @@ class YahooDownloader:
         select_stocks_list = list(names[equal_list])
         df = df[df.tic.isin(select_stocks_list)]
         return df
+
+
+def format_json(df):
+    # Convert DataFrame to JSON, orient it as 'index' to use the index as keys
+    formatted_json = df.to_json(orient="index")
+    return formatted_json
