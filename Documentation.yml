@@ -160,9 +160,9 @@ paths:
         - "application/json"
       parameters:
         - in: "path"
-          name: "user_id"
+          name: "username"
           required: true
-          type: "integer"
+          type: "string"
         - in: "body"
           name: "body"
           description: "Object containing stock tickers and shares"
