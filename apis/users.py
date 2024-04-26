@@ -6,7 +6,7 @@ import jwt, re, json
 from services.utils import YahooDownloader, is_date_well_formatted, format_json
 import modal
 from datetime import datetime, timedelta
-
+import pandas as pd
 
 users = Blueprint("users", __name__, url_prefix="/user")
 
@@ -92,8 +92,10 @@ def modify_user_info(username):
 
     if "money_owned" not in data:
         errors["money_owned"] = "money owned is missing"
-    elif not isinstance(data["money_owned"], float):
-        errors["money_owned"] = "money owned must be a float"
+    elif not isinstance(data["money_owned"], float) and not isinstance(
+        data["money_owned"], int
+    ):
+        errors["money_owned"] = "money owned must be a float or an int"
 
     if len(errors) != 0:
         return jsonify(errors), 400
@@ -276,7 +278,17 @@ def infer(user_id):
     end_date = datetime.today().date().strftime("%Y-%m-%d")
     start_date = datetime.today().date() - timedelta(days=45)
     user_stocks_tickers = [stock.stock for stock in user.stocks]
+    user_stocks_number_of_shares_owned = [stock.shares for stock in user.stocks]
 
+    data = {
+        "stock_tickers": user_stocks_tickers,
+        "shares_owned": user_stocks_number_of_shares_owned,
+    }
+
+    pstocks = pd.DataFrame(
+        data["shares_owned"], index=data["stock_tickers"], columns=["shares_owned"]
+    ).T
+    print(pstocks)
     yahooDownloader = YahooDownloader(start_date, end_date, user_stocks_tickers)
     stock_data = None
     try:
@@ -286,7 +298,7 @@ def infer(user_id):
 
     stock_data["sentiment"] = 0
     process = modal.Function.lookup("hello", "infer")
-    response = process.remote(username, stock_data)
+    response = process.remote(username, stock_data, pstocks)
     json_response = format_json(response)
     print(json_response)
     return jsonify(json.loads(json_response)), 200
