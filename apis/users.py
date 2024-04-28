@@ -3,7 +3,12 @@ from config.database import User, user_schema, UserStock, user_stock_schema
 from config.database import db
 from services.authentication import extract_auth_token, decode_token
 import jwt, re, json
-from services.utils import YahooDownloader, is_date_well_formatted, format_json
+from services.utils import (
+    YahooDownloader,
+    is_date_well_formatted,
+    format_json,
+    helperNews,
+)
 import modal
 from datetime import datetime, timedelta
 import pandas as pd
@@ -115,6 +120,10 @@ def modify_user_info(username):
             user_stock = UserStock(user_id=user_id, stock=stock_ticker, shares=shares)
             db.session.add(user_stock)
         user_stock.shares = shares
+
+    for stock in user.stocks:
+        if stock.stock not in stock_tickers:
+            db.session.delete(stock)
 
     user.funds = money_owned
 
@@ -255,9 +264,15 @@ def train_model(username):
     username = user.user_name
     user_funds = user.funds
     user_stocks_tickers = [stock.stock for stock in user.stocks]
-    start_date = "2015-01-01"
+    start_date = "2020-01-01"
     end_date = "2021-01-01"
 
+    # News, stock_info = helperNews(user_stocks_tickers, start_date, end_date)
+
+    p = modal.Function.lookup("hello", "get_historical_sentiment_modal")
+    response = p.remote(start_date, end_date, user_stocks_tickers)
+    print(response)
+    print(response.shape)
     yahooDownloader = YahooDownloader(start_date, end_date, user_stocks_tickers)
     stock_data = None
     try:

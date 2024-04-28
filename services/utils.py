@@ -3,6 +3,15 @@ from __future__ import annotations
 import pandas as pd
 import yfinance as yf
 import re
+import requests
+from datetime import datetime, timedelta
+import alpaca_trade_api as tradeapi
+from alpaca_trade_api.rest import REST, TimeFrame, TimeFrameUnit
+import time
+import wikipediaapi
+from bs4 import BeautifulSoup
+import os
+import json
 
 
 def is_date_well_formatted(date: str) -> bool:
@@ -22,6 +31,171 @@ class News_object:
 
     def __str__(self):
         return f"Headline: {self.headline}, URL: {self.url}, Publisher: {self.publisher}, Date: {self.date}, Stock: {self.stock}"
+
+
+def helperNews(start_date, end_date, stock_tickers):
+
+    ALPACA_API_KEY = "PKSEJNX9YPTO2VEG3A0P"
+    ALPACA_SECRET_KEY = "EyexfhDMKEy4f01cDEfZpbyXMUApt8nGI29fkP0f"
+
+    symbol = "AAPL"
+
+    headers = {
+        "APCA-API-KEY-ID": "PKSEJNX9YPTO2VEG3A0P",
+        "APCA-API-SECRET-KEY": "EyexfhDMKEy4f01cDEfZpbyXMUApt8nGI29fkP0f",
+    }
+
+    tickers = ",".join(stock_tickers)
+    alpaca_news_url = f"https://data.alpaca.markets/v1beta1/news?symbols={tickers}&limit=10&start={start_date}&end={end_date}&sort=ASC"
+    alpaca_stock_url = f"https://paper-api.alpaca.markets"
+    print(alpaca_stock_url)
+    response = requests.get(alpaca_news_url, headers=headers)
+    financial_data = response.json()
+    print(financial_data)
+    print(len(financial_data["news"]))
+    News = []
+    token = ""
+    last_status_code = 0
+    while (
+        last_status_code == 429
+        or last_status_code == 403
+        or (financial_data["next_page_token"] != None)
+    ):
+        if last_status_code != 429 and last_status_code != 403:
+            for raw_news in financial_data["news"]:
+                for stock_symbol in raw_news["symbols"]:
+                    if stock_symbol == None or stock_symbol == "":
+                        continue
+                    News.append(
+                        News_object(
+                            headline=raw_news["headline"],
+                            url=raw_news["url"] or "X",
+                            publisher=raw_news["source"] or "X",
+                            date=raw_news["created_at"],
+                            stock=stock_symbol,
+                        )
+                    )
+        try:
+            token = financial_data[
+                "next_page_token"
+            ]  # Tries to modify token with new one
+        except:
+            pass  # Token not modified
+        response = requests.get(
+            f"https://data.alpaca.markets/v1beta1/news?symbols={tickers}&limit=50&start={start_date}&end={end_date}&sort=ASC&page_token={token}",
+            headers=headers,
+        )
+
+        if response.status_code == 429 or response.status_code == 403:
+            print("Waiting")
+            time.sleep(20)
+        financial_data = response.json()
+        last_status_code = response.status_code
+
+    company_info = {}
+    ticker_to_name = {}
+
+    def save_cache_to_disk():
+        directory = "scratch/localdata"
+
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+        with open(os.path.join(directory, "company_info.json"), "w") as file:
+            json.dump(company_info, file)
+        with open(os.path.join(directory, "ticker_to_name.json"), "w") as file:
+            json.dump(ticker_to_name, file)
+
+    def load_cache_from_disk():
+        directory = "/localdata"
+        if not os.path.exists(directory):
+            return None, None
+        with open(os.path.join(directory, "company_info.json"), "r") as file:
+            company_info = json.load(file)
+        with open(os.path.join(directory, "ticker_to_name.json"), "r") as file:
+            ticker_to_name = json.load(file)
+
+    def get_company_name_from_ticker(ticker):
+        if ticker in ticker_to_name:
+            return ticker_to_name[ticker]
+
+        company_name = None
+        url = f"https://finance.yahoo.com/quote/{ticker}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
+        }
+        response = requests.get(url, headers=headers)
+
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.content, "html.parser")
+            company_name_element = soup.find("h1", class_="D(ib) Fz(18px)")
+            if company_name_element:
+                company_name = company_name_element.text
+            else:
+                company_name_element = soup.find("title")
+                if company_name_element:
+                    company_name = company_name_element.text.split(" (")[0]
+
+        if company_name:
+            ticker_to_name[ticker] = company_name
+        return company_name
+
+    def get_wikipedia_first_paragraph(company_name):
+        if not company_name:
+            return ""
+
+        user_agent = "my_script/1.0"
+        wiki = wikipediaapi.Wikipedia(user_agent=user_agent)
+        page = wiki.page(company_name + " company")
+        if not page.exists():
+            page = wiki.page(company_name)
+        if not page.exists():
+            return ""
+
+        content = page.text
+        first_section_index = content.find("==")
+        if first_section_index != -1:
+            content = content[:first_section_index]
+        end_first_paragraph_index = content.find("\n\n")
+        if end_first_paragraph_index != -1:
+            first_paragraph = content[:end_first_paragraph_index]
+            return first_paragraph
+
+        return content
+
+    def getBackground(ticker):
+        ## Ticker could be a $APPL ticker, or APPL ticker, or a company name, Apple
+        company_name = ticker
+        if ticker[0] == "$" or ticker.isupper():
+            if ticker[0] == "$":
+                ticker = ticker[1:]
+            company_name_temp = get_company_name_from_ticker(ticker)
+            if company_name_temp:
+                company_name = company_name_temp
+        if company_name not in company_info:
+            first_paragraph = get_wikipedia_first_paragraph(company_name)
+            company_info[company_name] = first_paragraph
+        return company_info[company_name]
+
+    def get_financial_info(ticker):
+
+        url = f"https://query1.finance.yahoo.com/v10/finance/quoteSummary/{ticker}"
+        params = {"modules": "summaryDetail,defaultKeyStatistics,financialData"}
+        response = requests.get(url, params=params)
+        if response.status_code == 200:
+            data = response.json()
+            # Process and extract relevant financial information from the response data
+            return data
+        else:
+            return None
+
+    stock = {}
+    for comp in stock_tickers:
+        stock[comp] = ""
+
+    for comp in stock:
+        stock[comp] = getBackground(comp)
+        
+    return News, stock
 
 
 """Contains methods and classes to collect data from
