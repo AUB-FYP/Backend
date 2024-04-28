@@ -323,7 +323,7 @@ def infer(username):
 
     stock_data["sentiment"] = 0
     process = modal.Function.lookup("hello", "infer")
-    response = process.remote(username, stock_data, pstocks)
+    response = process.remote(username, stock_data, user.funds, pstocks)
     json_response = format_json(response)
     print(json_response)
     return jsonify(json.loads(json_response)), 200
